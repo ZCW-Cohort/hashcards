@@ -1,0 +1,85 @@
+name: Test
+on: push
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: use rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+
+      - name: cache rust deps
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+  machete:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: cache rust deps
+        uses: Swatinem/rust-cache@v2
+
+      - name: install cargo-machete
+        run: cargo install cargo-machete
+
+      - name: cargo machete
+        run: cargo machete
+
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: use rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: cache rust deps
+        uses: Swatinem/rust-cache@v2
+
+      - name: install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: fetch deps
+        run: cargo fetch
+
+      - name: run tests
+        run: >
+          cargo llvm-cov
+          --all-features
+          --workspace
+          --lcov
+          --ignore-filename-regex '(main|error|cli).rs'
+          --output-path lcov.info
+        env:
+          RUST_LOG: debug
+
+      - name: upload to codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
